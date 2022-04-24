@@ -21,7 +21,7 @@ if __name__ == "__main__":
         instance_dir = os.path.join(
             dataset_dir, f"ADEChallengeData2016/annotations_instance/{dirname}/"
         )
-
+        instance_dir = "/home/cap6412.student23/MaskRCNN_cell/notebook/trainingDataRound2B"
         # img_id = 0
         ann_id = 1
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         out_file = os.path.join(dataset_dir, f"ADEChallengeData2016/ade20k_instance_{name}.json")
 
         # json config
-        instance_config_file = "datasets/ade20k_instance_imgCatIds.json"
+        instance_config_file = "datasets/nucleus_instance_imgCatIds.json"
         with open(instance_config_file) as f:
             category_dict = json.load(f)["categories"]
 
@@ -45,11 +45,17 @@ if __name__ == "__main__":
                 # shift id by 1 because we want it to start from 0!
                 # ignore_label becomes 255
                 map_id[int(ins_id)] = int(sem_id) - 1
+        map_id = {}
+        map_id[1] = 2
 
         for cat in category_dict:
             cat["id"] = map_id[cat["id"]]
+        category_dict = [{'id': 2, 'name': 'nucleus'}]
 
-        filenames = sorted(glob.glob(os.path.join(image_dir, "*.jpg")))
+
+        # filenames = sorted(glob.glob(os.path.join(image_dir, "*.jpg")))
+        filenames = sorted((glob.glob("/home/cap6412.student23/MaskRCNN_cell/notebook/trainingDataRound2B/*Nuclei.jpg")))
+
 
         ann_dict = {}
         images = []
@@ -68,17 +74,26 @@ if __name__ == "__main__":
 
             images.append(image)
 
-            filename_instance = os.path.join(instance_dir, image_id + ".png")
+            # filename_instance = os.path.join(instance_dir, image_id + ".png")
+            filename_instance = os.path.join(instance_dir, image_id + "_nucleus.ome.tiff")
             ins_seg = np.asarray(Image.open(filename_instance))
-            assert ins_seg.dtype == np.uint8
+            # assert ins_seg.dtype == np.uint8
+            print("img: ")
+            print(ins_seg.shape)
 
             instance_cat_ids = ins_seg[..., 0]
             # instance id starts from 1!
             # because 0 is reserved as VOID label
             instance_ins_ids = ins_seg[..., 1]
+            print("ins_ids: ")
+            print(instance_ins_ids)
+
+            print("ins_ids_uniq: ")
+            print(np.unique(instance_ins_ids))
 
             # process things
             for thing_id in np.unique(instance_ins_ids):
+                print("--------------------------------------")
                 if thing_id == 0:
                     continue
                 mask = instance_ins_ids == thing_id
@@ -91,6 +106,10 @@ if __name__ == "__main__":
                 anno['image_id'] = image['id']
                 anno["iscrowd"] = int(0)
                 anno["category_id"] = int(map_id[instance_cat_id[0]])
+                print("midway")
+                print(anno)
+                print(mask)
+                print(np.nonzero(mask))
 
                 inds = np.nonzero(mask)
                 ymin, ymax = inds[0].min(), inds[0].max()
@@ -102,6 +121,7 @@ if __name__ == "__main__":
                 rle["counts"] = rle["counts"].decode("utf-8")
                 anno["segmentation"] = rle
                 anno["area"] = int(mask_util.area(rle))
+                print(anno)
                 annotations.append(anno)
 
         # save this

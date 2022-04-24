@@ -1,5 +1,5 @@
 Instacne100	SceneParse150	FullADE20K
-1		8		165
+165		8		0
 2		9		3055
 3		11		350
 4		13		1831
