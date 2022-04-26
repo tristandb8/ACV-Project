@@ -25,6 +25,7 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
                  num_encoder_layers=6, dim_feedforward=1024, dropout=0.1,
                  activation="relu",
                  num_feature_levels=4, enc_n_points=4,
+                 focus=0.5
         ):
         super().__init__()
 
@@ -33,7 +34,8 @@ class MSDeformAttnTransformerEncoderOnly(nn.Module):
 
         encoder_layer = MSDeformAttnTransformerEncoderLayer(d_model, dim_feedforward,
                                                             dropout, activation,
-                                                            num_feature_levels, nhead, enc_n_points)
+                                                            num_feature_levels, nhead, enc_n_points,
+                                                            focus)
         self.encoder = MSDeformAttnTransformerEncoder(encoder_layer, num_encoder_layers)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
@@ -93,11 +95,12 @@ class MSDeformAttnTransformerEncoderLayer(nn.Module):
     def __init__(self,
                  d_model=256, d_ffn=1024,
                  dropout=0.1, activation="relu",
-                 n_levels=4, n_heads=8, n_points=4):
+                 n_levels=4, n_heads=8, n_points=4,
+                 focus = 0.5):
         super().__init__()
 
         # self attention
-        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
+        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, focus)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
@@ -171,6 +174,7 @@ class MSDeformAttnPixelDecoder(nn.Module):
         transformer_dropout: float,
         transformer_nheads: int,
         transformer_dim_feedforward: int,
+        deformable_focus: float,
         transformer_enc_layers: int,
         conv_dim: int,
         mask_dim: int,
@@ -186,6 +190,7 @@ class MSDeformAttnPixelDecoder(nn.Module):
             transformer_dropout: dropout probability in transformer
             transformer_nheads: number of heads in transformer
             transformer_dim_feedforward: dimension of feedforward network
+            deformable_focus: focus term used in deformable attention
             transformer_enc_layers: number of transformer encoder layers
             conv_dims: number of output channels for the intermediate conv layers.
             mask_dim: number of output channels for the final conv layer.
@@ -236,6 +241,7 @@ class MSDeformAttnPixelDecoder(nn.Module):
             dim_feedforward=transformer_dim_feedforward,
             num_encoder_layers=transformer_enc_layers,
             num_feature_levels=self.transformer_num_feature_levels,
+            focus=deformable_focus,
         )
         N_steps = conv_dim // 2
         self.pe_layer = PositionEmbeddingSine(N_steps, normalize=True)
@@ -301,6 +307,7 @@ class MSDeformAttnPixelDecoder(nn.Module):
         ret["mask_dim"] = cfg.MODEL.SEM_SEG_HEAD.MASK_DIM
         ret["norm"] = cfg.MODEL.SEM_SEG_HEAD.NORM
         ret["transformer_dropout"] = cfg.MODEL.MASK_FORMER.DROPOUT
+        ret["deformable_focus"] =cfg.MODEL.DEFORMABLE_FOCUS
         ret["transformer_nheads"] = cfg.MODEL.MASK_FORMER.NHEADS
         # ret["transformer_dim_feedforward"] = cfg.MODEL.MASK_FORMER.DIM_FEEDFORWARD
         ret["transformer_dim_feedforward"] = 1024  # use 1024 for deformable transformer encoder
