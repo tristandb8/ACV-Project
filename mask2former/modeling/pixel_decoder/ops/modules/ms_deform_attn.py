@@ -32,7 +32,7 @@ def _is_power_of_2(n):
 
 
 class MSDeformAttn(nn.Module):
-    def __init__(self, d_model=256, n_levels=4, n_heads=8, n_points=4):
+    def __init__(self, d_model=256, n_levels=4, n_heads=8, n_points=4, focus=.5):
         """
         Multi-Scale Deformable Attention Module
         :param d_model      hidden dimension
@@ -55,8 +55,12 @@ class MSDeformAttn(nn.Module):
         self.n_levels = n_levels
         self.n_heads = n_heads
         self.n_points = n_points
+        self.focus = focus
 
-        self.sampling_offsets = nn.Linear(d_model, n_heads * n_levels * n_points * 2)
+        self.sampling_offsets = nn.Sequential(
+            nn.Linear(d_model, n_heads * n_levels * n_points * 2),
+            nn.Tanh(),
+        )
         self.attention_weights = nn.Linear(d_model, n_heads * n_levels * n_points)
         self.value_proj = nn.Linear(d_model, d_model)
         self.output_proj = nn.Linear(d_model, d_model)
@@ -105,11 +109,13 @@ class MSDeformAttn(nn.Module):
         # N, Len_q, n_heads, n_levels, n_points, 2
         if reference_points.shape[-1] == 2:
             offset_normalizer = torch.stack([input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1)
+            
             sampling_locations = reference_points[:, :, None, :, None, :] \
-                                 + sampling_offsets / offset_normalizer[None, None, None, :, None, :]
+                                 + self.focus * (sampling_offsets / offset_normalizer[None, None, None, :, None, :]) 
         elif reference_points.shape[-1] == 4:
             sampling_locations = reference_points[:, :, None, :, None, :2] \
                                  + sampling_offsets / self.n_points * reference_points[:, :, None, :, None, 2:] * 0.5
+
         else:
             raise ValueError(
                 'Last dim of reference_points must be 2 or 4, but get {} instead.'.format(reference_points.shape[-1]))
